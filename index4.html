@@ -1,0 +1,995 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
+  <title>FeedbackAI — Instant Insights</title>
+
+  <!-- Inter font -->
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+
+  <style>
+    :root{
+      --bg1:#0f0c29;
+      --bg2:#302b63;
+      --bg3:#24243e;
+      --glass: rgba(255,255,255,0.06);
+      --glass-strong: rgba(255,255,255,0.12);
+      --stroke: rgba(255,255,255,0.18);
+      --text: #E8E8F0;
+      --muted: #A9A9BD;
+      --accent1: #7c5cff;
+      --accent2: #00d4ff;
+      --shadow: 0 10px 30px rgba(0,0,0,0.35);
+      --radius-xl: 18px;
+      --error-glow: rgba(255, 70, 70, 0.15);
+      --error-border: rgba(255, 100, 100, 0.3);
+      --error-text: #ffb4b4;
+      --success: #7ef0b0;
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family: 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      color:var(--text);
+      background: linear-gradient(-45deg, var(--bg1), var(--bg2), var(--bg3), var(--bg2));
+      background-size:400% 400%;
+      animation: bgshift 16s ease infinite;
+      min-height:100vh;
+      display:flex;
+      flex-direction:column;
+    }
+    @keyframes bgshift { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
+
+    /* breathing blurred SVG icon */
+    .bg-icon{
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      display: grid;
+      place-items: center;
+      z-index: 0;
+      opacity: 0.12;
+      filter: blur(10px) drop-shadow(0 40px 80px rgba(0,0,0,0.55));
+    }
+    .bg-icon svg{ width:min(72vmin,760px); height:auto; animation: breathe 8s ease-in-out infinite; }
+    @keyframes breathe{ 0%,100%{transform:scale(1)} 50%{transform:scale(1.05)} }
+
+    .container{
+      position:relative; z-index:1; max-width:1200px; margin:clamp(16px,4vw,40px) auto;
+      padding:0 18px 64px; width:94%; flex-grow:1;
+    }
+
+    nav{
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      padding:14px 18px;
+      background: linear-gradient(to bottom right, rgba(255,255,255,0.10), rgba(255,255,255,0.03));
+      border:1px solid var(--stroke); border-radius: calc(var(--radius-xl) + 6px);
+      backdrop-filter: blur(14px) saturate(130%); box-shadow: var(--shadow);
+      position: sticky; top:12px; z-index:100;
+    }
+    .brand{ display:flex; align-items:center; gap:12px; font-weight:900; font-size:clamp(18px,2.6vw,24px) }
+    .brand-badge{ display:grid; place-items:center; width:40px;height:40px;border-radius:12px;
+      background: conic-gradient(from 210deg, var(--accent1), var(--accent2)); color:#0b0b14; font-weight:900;
+      box-shadow: 0 6px 18px rgba(124,92,255,0.14);
+    }
+
+    .nav-actions{ display:flex; gap:10px; align-items:center }
+    .btn{
+      appearance:none;border:1px solid var(--stroke); background:var(--glass); color:var(--text);
+      border-radius:12px; padding:10px 14px; font-weight:600; cursor:pointer;
+      transition: transform .12s ease, background .18s ease, border-color .18s ease;
+    }
+    .btn:hover{ transform: translateY(-2px); background:var(--glass-strong); border-color: rgba(255,255,255,0.28) }
+    .btn.active{ background: linear-gradient(90deg, rgba(124,92,255,0.22), rgba(0,212,255,0.18)); border-color: rgba(255,255,255,0.35) }
+
+    main{ margin-top:20px; display:grid; gap:18px }
+
+    .page{ display:none }
+    .page.active{ display:grid; gap:18px; animation: pageFadeIn .45s ease-out }
+
+    @keyframes pageFadeIn { from{opacity:0; transform:translateY(10px)} to{opacity:1; transform:translateY(0)} }
+
+    .panel{
+      background: linear-gradient(to bottom right, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+      border:1px solid var(--stroke); border-radius:var(--radius-xl); backdrop-filter: blur(18px) saturate(140%);
+      box-shadow: var(--shadow); padding: clamp(16px,3.2vw,28px);
+    }
+
+    .title{ font-weight:900; font-size:clamp(30px,5.6vw,48px); line-height:1.02; margin:6px 0 4px }
+    .gradient-text{ background: linear-gradient(90deg,#B3A6FF,#7c5cff,#00d4ff,#6ef3ff); -webkit-background-clip:text; background-clip:text; color:transparent }
+    .subtitle{ color:var(--muted); font-size:clamp(13px,2vw,16px); margin:0 0 16px }
+
+    .input-row{ display:flex; gap:12px; align-items:flex-start; flex-wrap:wrap }
+    .vibe-input{
+      flex:1 1 380px; min-width:220px; background:rgba(0,0,0,0.35); color:var(--text);
+      border:1px solid var(--stroke); border-radius:12px; padding:14px; outline:none;
+      transition: border-color .2s ease, background .2s ease, box-shadow .2s ease; font-size:15px;
+      font-family:'Inter', system-ui; min-height:160px; resize:vertical; box-shadow: inset 0 -6px 24px rgba(0,0,0,0.25);
+    }
+    .vibe-input::placeholder{ color:#bdbdd4; opacity:0.9 }
+    .vibe-input:focus{ border-color: rgba(124,92,255,0.65); background: rgba(0,0,0,0.5); box-shadow:0 0 0 8px rgba(124,92,255,0.08) }
+
+    #find-spot-btn{ padding:14px 18px; background: linear-gradient(90deg,var(--accent1),var(--accent2)); color:#0a0a12; border:none; font-weight:800 }
+
+    #response-area{ margin-top:18px; display:grid; gap:14px }
+
+    .result-card{
+      background: linear-gradient(180deg, rgba(255,255,255,0.012), rgba(255,255,255,0.01));
+      border:1px solid rgba(255,255,255,0.03); display:grid; gap:14px; padding: clamp(14px,2.5vw,24px);
+      border-radius:12px; animation: pageFadeIn .45s ease-out forwards;
+    }
+    .result-card .top{ display:flex; gap:14px; align-items:center; flex-wrap:wrap }
+    .result-title{ font-weight:800; font-size:20px; letter-spacing:.2px }
+    .badge{ padding:6px 10px; border-radius:999px; font-size:12px; font-weight:700; background:rgba(255,255,255,0.06); border:1px solid var(--stroke); color:#dfe8ff }
+    .result-img{ width:100%; border-radius:12px; border:1px solid var(--stroke); overflow:hidden }
+
+    .muted{ color:var(--muted) }
+
+    .tag-cloud{ display:flex; flex-wrap:wrap; gap:10px; margin:10px 0 2px }
+    .tag{ padding:8px 12px; background: rgba(255,255,255,0.06); border:1px solid var(--stroke); border-radius:999px; font-weight:600; font-size:14px; transition:all .18s ease }
+    .tag:hover{ transform:translateY(-3px); background:var(--glass-strong); border-color: rgba(255,255,255,0.28) }
+
+    .testimonial-grid{ display:grid; gap:12px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); margin-top:8px }
+    .testimonial-card{ padding:14px; border-radius:14px; border:1px solid var(--stroke); background: rgba(255,255,255,0.03); transition:all .18s ease }
+    .testimonial-card:hover{ transform:translateY(-3px); background:var(--glass-strong); border-color: rgba(255,255,255,0.28) }
+    .testimonial-card .who{ opacity:.9; font-weight:700; margin-top:6px; color:var(--accent1) }
+
+    footer{ margin-top:24px; padding:16px 18px; border:1px solid var(--stroke); background: rgba(255,255,255,0.04); border-radius:var(--radius-xl); display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:13px; color:var(--muted); box-shadow:var(--shadow) }
+
+    /* cursor */
+    .vibe-cursor-dot, .vibe-cursor-outline{ position:fixed; top:0; left:0; transform:translate(-50%,-50%); pointer-events:none; z-index:9999; opacity:1; transition:opacity .2s ease; mix-blend-mode:lighten }
+    .vibe-cursor-dot{ width:7px;height:7px;border-radius:50%; background:white; box-shadow:0 0 18px rgba(255,255,255,0.6), 0 0 36px rgba(124,92,255,0.36) }
+    .vibe-cursor-outline{ width:34px;height:34px;border-radius:999px;border:2px solid rgba(255,255,255,0.85); box-shadow:0 0 50px rgba(124,92,255,0.35); transition:transform .08s ease-out, opacity .2s ease }
+    .vibe-cursor-hidden{ opacity:0 !important }
+
+    @media (pointer: coarse), (max-width:780px){ .vibe-cursor-dot, .vibe-cursor-outline{ display:none !important } body{ cursor:auto !important } }
+
+    ul.themelist{ padding-left:0; margin:8px 0; list-style:none }
+    ul.themelist li{ position:relative; padding-left:20px; margin-bottom:6px; color:var(--text) }
+    ul.themelist li::before{ content:'✨'; position:absolute; left:0; top:0; font-size:12px }
+    ol li{ margin-bottom:6px; color:var(--text) }
+
+    .error{ color:var(--error-text); background:rgba(255,70,70,0.05); padding:10px; border-radius:8px; border:1px solid var(--error-border); box-shadow:0 0 15px var(--error-glow) }
+
+    .typing-indicator{ display:flex; align-items:center; justify-content:center; padding:1.5rem }
+    .typing-indicator span{ height:8px; width:8px; margin:0 2px; background-color:var(--muted); border-radius:50%; display:inline-block; animation:bounce 1.4s infinite both }
+    .typing-indicator span:nth-child(1){ animation-delay:0s } .typing-indicator span:nth-child(2){ animation-delay:.2s } .typing-indicator span:nth-child(3){ animation-delay:.4s }
+    @keyframes bounce{ 0%,80%,100%{ transform:scale(0) } 40%{ transform:scale(1) } }
+
+    /* history styles */
+    .history-controls{ display:flex; gap:8px; align-items:center }
+    .history-toolbar{ display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap }
+    .history-list-item{ display:flex;align-items:center;gap:12px;padding:10px;border-radius:10px;margin-bottom:10px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.02) }
+
+    .pill{ padding:6px 10px;border-radius:999px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.02);font-size:13px }
+    input[type="search"], select { background:rgba(0,0,0,0.35); border:1px solid var(--stroke); color:var(--text); padding:8px 10px; border-radius:10px; outline:none }
+    input[type="search"]::placeholder{ color:var(--muted) }
+
+    .pie-wrap{ display:flex; gap:18px; align-items:center; margin-top:12px; flex-wrap:wrap }
+    canvas.pie { background: rgba(0,0,0,0.03); border-radius:8px; padding:8px; }
+
+    @media (max-width:820px){
+      .input-row{ flex-direction:column }
+      .pie-wrap{ justify-content:center }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- breathing background icon -->
+  <div class="bg-icon" aria-hidden="true">
+    <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <linearGradient id="pinGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#7C5CFF"/>
+          <stop offset="1" stop-color="#00D4FF"/>
+        </linearGradient>
+      </defs>
+
+      <g opacity="0.9" transform="translate(0,8) scale(1.05)">
+        <circle cx="100" cy="80" r="72" fill="url(#pinGrad)" opacity="0.06"/>
+        <g transform="translate(24,40)">
+          <rect x="0" y="72" width="12" height="48" rx="3" fill="#7C5CFF" opacity="0.28"/>
+          <rect x="30" y="38" width="12" height="82" rx="3" fill="#00D4FF" opacity="0.28"/>
+          <rect x="60" y="56" width="12" height="64" rx="3" fill="#7C5CFF" opacity="0.28"/>
+          <rect x="90" y="20" width="12" height="100" rx="3" fill="#00D4FF" opacity="0.28"/>
+        </g>
+      </g>
+    </svg>
+  </div>
+
+  <div class="container">
+    <nav aria-label="Primary">
+      <div class="brand"><div class="brand-badge">FA</div>FeedbackAI</div>
+      <div class="nav-actions" role="navigation" aria-label="Main">
+        <button id="nav-home" class="btn active" data-page="home" aria-controls="home">Home</button>
+        <button id="nav-about" class="btn" data-page="about" aria-controls="about">About</button>
+        <button id="nav-history" class="btn" data-page="history" aria-controls="history">History</button>
+      </div>
+    </nav>
+
+    <main>
+      <!-- HOME -->
+      <section id="home" class="page active panel" aria-live="polite">
+        <h1 class="title gradient-text">Instant Insights.</h1>
+        <p class="subtitle">Paste your customer feedback and our AI will find the signal in the noise.</p>
+
+        <div class="input-row">
+          <textarea id="vibe-input" class="vibe-input" placeholder="Paste 1-10 customer reviews here..."></textarea>
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <button id="find-spot-btn" class="btn" aria-live="polite">Analyze Feedback</button>
+            <button id="example-fill" class="btn">Fill Examples</button>
+            <button id="clear-input" class="btn">Clear</button>
+          </div>
+        </div>
+
+        <div id="response-area" style="margin-top:18px;">
+          <div class="muted">Try pasting a review above to get an AI analysis ✨</div>
+        </div>
+      </section>
+
+      <!-- ABOUT -->
+      <section id="about" class="page panel" aria-hidden="true">
+        <h1 class="title">About <span class="gradient-text">FeedbackAI</span></h1>
+        <p class="subtitle">We find the signal in the noise. Instantly.</p>
+
+        <h2>Our Unique Vibe</h2>
+        <p class="muted">FeedbackAI turns raw customer feedback into prioritized product actions. It extracts sentiment, clusters themes, and provides two concrete next steps you can hand to engineering or product managers.</p>
+
+        <h2>Vibe Inspiration</h2>
+        <div class="tag-cloud">
+          <span class="tag">Positive Reviews</span>
+          <span class="tag">Bug Reports</span>
+          <span class="tag">Feature Requests</span>
+          <span class="tag">Mixed Sentiment</span>
+          <span class="tag">Pricing Feedback</span>
+          <span class="tag">UI/UX Issues</span>
+        </div>
+
+        <h2>Why these feedbacks matter</h2>
+        <p class="muted">Collecting and analyzing feedback helps you prioritize work, detect regressions, reduce churn, and surface high-impact improvements for your roadmap. You gain faster triage, clearer stakeholder communication, and measurable impact from fixes.</p>
+
+        <h2 style="margin-top:12px">Examples of reviews (complex / realistic)</h2>
+        <ul class="themelist">
+          <li>"The app keeps crashing when I upload CSVs >10k rows and sometimes logs me out. Error says 'Upload failed'."</li>
+          <li>"Love the dashboard but filters reset when I navigate away — please remember filter state."</li>
+          <li>"Support took 2 days and several transfers; the fix wasn't documented so I couldn't explain it to my manager."</li>
+        </ul>
+      </section>
+
+      <!-- HISTORY -->
+      <section id="history" class="page panel" aria-hidden="true">
+        <h1 class="title">History</h1>
+        <p class="subtitle">Saved analyses — reopen, download, share, inspect, or remove previous AI results.</p>
+
+        <div class="history-toolbar">
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <input id="history-search" type="search" placeholder="Search sentiment, theme, or keyword..." />
+            <select id="history-filter">
+              <option value="all">All sentiments</option>
+              <option value="Positive">Positive</option>
+              <option value="Negative">Negative</option>
+              <option value="Mixed">Mixed</option>
+            </select>
+            <select id="history-sort">
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+            </select>
+          </div>
+
+          <div style="display:flex;gap:8px;align-items:center">
+            <div class="pill" id="history-count">0 items</div>
+            <button id="clear-history-global" class="btn">Clear All</button>
+            <button id="import-json" class="btn">Import JSON</button>
+            <input id="import-file" type="file" accept="application/json" style="display:none" />
+          </div>
+        </div>
+
+        <div class="pie-wrap" aria-hidden="false">
+          <div style="min-width:220px;">
+            <canvas id="sentiment-pie" width="260" height="260" class="pie"></canvas>
+            <div style="text-align:center;margin-top:8px;color:var(--muted);font-size:13px">Sentiment distribution</div>
+          </div>
+          <div style="flex:1;min-width:260px;">
+            <div id="history-list-root" style="max-height:420px;overflow:auto;padding-right:6px"></div>
+          </div>
+        </div>
+
+        <div style="display:flex;justify-content:center;gap:10px;margin-top:12px;">
+          <button id="prev-page" class="btn">Prev</button>
+          <div class="pill" id="page-indicator">Page 1</div>
+          <button id="next-page" class="btn">Next</button>
+        </div>
+
+      </section>
+    </main>
+
+    <footer>
+      <div>© <span id="year"></span> FeedbackAI</div>
+      <div>Team: Bimalendu Misra • Atri Mukherjee • Niladri Das • Arik Roy</div>
+    </footer>
+  </div>
+
+  <!-- Custom cursors -->
+  <div class="vibe-cursor-dot" id="cursor-dot" aria-hidden="true"></div>
+  <div class="vibe-cursor-outline" id="cursor-outline" aria-hidden="true"></div>
+
+  <script>
+    /* ---------------------------
+       Utilities & DOM shortcuts
+       --------------------------- */
+    const $ = (sel, root=document) => root.querySelector(sel);
+    const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+
+    /* ---------------------------
+       Navigation (show/hide pages)
+       --------------------------- */
+    const pages = { home: $('#home'), about: $('#about'), history: $('#history') };
+    const navButtons = { home: $('#nav-home'), about: $('#nav-about'), history: $('#nav-history') };
+
+    function showPage(name){
+      Object.entries(pages).forEach(([id, el])=>{
+        const active = id === name;
+        el.style.display = active ? 'grid' : 'none';
+        el.classList.toggle('active', active);
+        el.setAttribute('aria-hidden', String(!active));
+      });
+      Object.entries(navButtons).forEach(([id, btn])=>{
+        const active = id === name;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-pressed', String(active));
+      });
+      if(name === 'history') renderHistory();
+    }
+    navButtons.home.addEventListener('click', ()=> showPage('home'));
+    navButtons.about.addEventListener('click', ()=> showPage('about'));
+    navButtons.history.addEventListener('click', ()=> showPage('history'));
+    showPage('home');
+
+    /* ---------------------------
+       Footer year
+       --------------------------- */
+    $('#year').textContent = new Date().getFullYear();
+
+    /* ---------------------------
+       Vibe cursor
+       --------------------------- */
+    (function vibeCursor(){
+      const dot = $('#cursor-dot'); const outline = $('#cursor-outline');
+      if(!dot || !outline) return;
+      let visible = true;
+      let x = window.innerWidth/2, y = window.innerHeight/2; let ox = x, oy = y;
+      const lerp = (a,b,t)=> a + (b-a)*t;
+
+      const show = ()=> { visible = true; dot.classList.remove('vibe-cursor-hidden'); outline.classList.remove('vibe-cursor-hidden'); }
+      const hide = ()=> { visible = false; dot.classList.add('vibe-cursor-hidden'); outline.classList.add('vibe-cursor-hidden'); }
+
+      // touch devices: hide
+      const isTouch = (('ontouchstart' in window) || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0);
+      if(isTouch){ dot.style.display='none'; outline.style.display='none'; return; }
+
+      window.addEventListener('mousemove', e => { x = e.clientX; y = e.clientY; dot.style.left = x+'px'; dot.style.top = y+'px'; show(); });
+      document.addEventListener('mouseleave', hide); document.addEventListener('mouseenter', show);
+
+      // small lag for outline
+      (function tick(){
+        ox = lerp(ox, x, 0.18); oy = lerp(oy, y, 0.18);
+        outline.style.left = ox+'px'; outline.style.top = oy+'px';
+        requestAnimationFrame(tick);
+      })();
+
+      // hide while focusing textarea
+      const input = $('#vibe-input');
+      if(input){
+        ['focus','click','mousedown'].forEach(ev => input.addEventListener(ev, hide));
+        ['blur'].forEach(ev => input.addEventListener(ev, show));
+      }
+      document.addEventListener('mousedown', ()=> outline.style.transform='translate(-50%,-50%) scale(0.8)');
+      document.addEventListener('mouseup', ()=> outline.style.transform='translate(-50%,-50%) scale(1)');
+    })();
+
+    /* ---------------------------
+       Fill example reviews helper
+       --------------------------- */
+    const EXAMPLES = [
+      "The app keeps crashing whenever I try to upload a CSV with >10k rows — loses progress and sometimes logs me out. I like the import feature, but this instability makes it impossible for my team to trust it for large reports. Also the error message is just 'Upload failed' with no guidance.",
+      "Love the new dashboard layout — the charts are clean and I can find things faster. That said, the filters reset every time I navigate away which is annoying; please remember filter state.",
+      "Customer support eventually helped, but it took two business days and several transfers to different reps. When they fixed my billing problem it wasn’t documented so I couldn’t explain the fix to my manager. Would pay more for faster, proactive help."
+    ];
+    $('#example-fill').addEventListener('click', ()=> {
+      $('#vibe-input').value = EXAMPLES.join("\n\n");
+    });
+    $('#clear-input').addEventListener('click', ()=> { $('#vibe-input').value = ''; });
+
+  </script>
+
+  <script>
+    /* ---------------------------
+       AI AGENT (Gemini) + Mock fallback (unchanged flow)
+       --------------------------- */
+
+    const apiKey = "AIzaSyD0U_Tdr0reYbYVM25lV-7gKMTHKvZjF1o"; // <-- replace server-side, never client-side in production
+    const GEMINI_ENDPOINT = "https://api.generativeai.googleapis.com/v1beta/models/gemini-flash-latest:generate";
+
+    const systemPrompt = `You are 'FeedbackAI', an expert in product management. A user will paste in raw customer feedback. Analyze it and respond with a 'Sentiment' (Positive, Negative, Mixed), a 'MainTheme' (e.g., 'App Speed', 'Customer Service'), a list of 3-5 'KeyThemes' (e.g., 'UI clarity', 'Pricing'), and 2 'ActionableInsights' (what the business should do next). Respond only with a valid JSON object in this exact format: { "sentiment": "[Positive/Negative/Mixed]", "mainTheme": "[Main Theme]", "keyThemes": ["[Theme 1]", "[Theme 2]", "[Theme 3]"], "insight1": "[Actionable Insight 1]", "insight2": "[Actionable Insight 2]" }`;
+    const generationConfig = { responseMimeType: "application/json" };
+
+    const vibeInput = $('#vibe-input');
+    const findBtn = $('#find-spot-btn');
+    const responseArea = $('#response-area');
+
+    function setLoading(){
+      responseArea.innerHTML = `
+        <div class="result-card">
+          <div class="typing-indicator"><span></span><span></span><span></span></div>
+        </div>
+      `;
+    }
+
+    function escapeHtml(s){
+      if(typeof s !== 'string') return String(s);
+      return s.replace(/[&<>"']/g, (m)=> ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;'}[m]));
+    }
+
+    function buildHtmlFromResult(data){
+      const sentiment = data.sentiment || 'Unknown';
+      const mainTheme = data.mainTheme || 'General';
+      const keyThemes = Array.isArray(data.keyThemes) ? data.keyThemes : [];
+      const insight1 = data.insight1 || '';
+      const insight2 = data.insight2 || '';
+
+      const themesHtml = keyThemes.length ? keyThemes.map(t=>`<li>${escapeHtml(t)}</li>`).join('') : '<li>No key themes found.</li>';
+      const phText = encodeURIComponent(`${sentiment} Analysis: ${mainTheme}`);
+      const phUrl = `https://placehold.co/1200x520/302b63/e8e8f0?text=${phText}`;
+
+      return `
+        <article class="result-card" aria-live="polite">
+          <img class="result-img" alt="Analysis snapshot" src="${phUrl}">
+          <div class="top">
+            <div class="result-title">${escapeHtml(sentiment)}</div>
+            <span class="badge">${escapeHtml(mainTheme)}</span>
+          </div>
+          <div class="muted" style="margin:4px 0 12px;">Here is the AI's analysis of the feedback provided:</div>
+          <div style="display:grid; gap:16px; grid-template-columns: 1fr 1fr;">
+            <div>
+              <strong style="display:block;margin-bottom:8px;">Key Themes</strong>
+              <ul class="themelist">${themesHtml}</ul>
+            </div>
+            <div>
+              <strong style="display:block;margin-bottom:8px;">Actionable Insights</strong>
+              <ol style="padding-left:18px;margin:0">
+                <li style="margin-bottom:6px">${escapeHtml(insight1)}</li>
+                <li>${escapeHtml(insight2)}</li>
+              </ol>
+            </div>
+          </div>
+          <div style="margin-top:12px;font-size:12px;color:var(--muted)">Raw JSON</div>
+          <pre style="background:rgba(0,0,0,0.25);padding:10px;border-radius:8px;margin-top:8px;font-size:12px;white-space:pre-wrap;">${escapeHtml(JSON.stringify(data, null, 2))}</pre>
+        </article>
+      `;
+    }
+
+    function extractModelText(respJson){
+      try{
+        if(!respJson) return '';
+        if(respJson?.candidates && respJson.candidates[0]){
+          const c = respJson.candidates[0];
+          if(typeof c === 'string') return c;
+          if(Array.isArray(c.content?.parts) && c.content.parts[0]?.text) return c.content.parts[0].text;
+          if(c.output && typeof c.output === 'string') return c.output;
+          if(c.content && typeof c.content === 'string') return c.content;
+        }
+        if(respJson?.output && Array.isArray(respJson.output) && respJson.output[0]?.content){
+          const content = respJson.output[0].content;
+          if(typeof content === 'string') return content;
+          if(Array.isArray(content)){
+            for(const el of content){ if(el?.text) return el.text; if(typeof el === 'string') return el; }
+          }
+        }
+        if(respJson?.choices && respJson.choices[0]?.message?.content) return respJson.choices[0].message.content;
+        if(typeof respJson.text === 'string') return respJson.text;
+      }catch(e){}
+      return JSON.stringify(respJson);
+    }
+
+    function createMockResponse(text){
+      const t = (text||'').toLowerCase();
+      const out = {
+        sentiment: "Mixed",
+        mainTheme: "Multiple",
+        keyThemes: ["UI clarity", "Stability", "Feature Requests"],
+        insight1: "Triage top-reported bugs and assign ownership.",
+        insight2: "Collect usage frequency to prioritize feature work."
+      };
+      if(/crash|crashes|crashed|not responding|force close/.test(t)){
+        out.sentiment = "Negative";
+        out.mainTheme = "Stability";
+        out.keyThemes = ["App Crashes","Upload Flow","Android"];
+        out.insight1 = "Prioritize a hotfix for the crash and add regression tests.";
+        out.insight2 = "Notify affected users and provide a temporary workaround.";
+        return out;
+      }
+      if(/slow|loading|lag|performance/.test(t)){
+        out.sentiment = "Negative";
+        out.mainTheme = "Performance";
+        out.keyThemes = ["Loading Time","Mobile Performance","API Latency"];
+        out.insight1 = "Profile slow endpoints and optimize database queries.";
+        out.insight2 = "Ship a performance patch and communicate improvements.";
+        return out;
+      }
+      if(/love|amazing|great|saved us|thank you/.test(t)){
+        out.sentiment = "Positive";
+        out.mainTheme = "Feature Delight";
+        out.keyThemes = ["UI/UX","Time Savings","Core Feature"];
+        out.insight1 = "Highlight the praised feature in onboarding to increase adoption.";
+        out.insight2 = "Collect additional user stories for marketing and roadmap.";
+        return out;
+      }
+      if(/pricing|pay-as-you-go|high/.test(t)){
+        out.sentiment = "Mixed";
+        out.mainTheme = "Pricing";
+        out.keyThemes = ["Pricing Model","Value Perception","Occasional Users"];
+        out.insight1 = "Test a pay-as-you-go tier for low-frequency users.";
+        out.insight2 = "Refine pricing messaging to emphasize ROI.";
+        return out;
+      }
+      return out;
+    }
+
+    async function callGeminiAPI(userText){
+      if(!apiKey || apiKey === "AIzaSyD0U_Tdr0reYbYVM25lV-7gKMTHKvZjF1o"){ throw new Error("NO_API_KEY"); }
+
+      const payload = {
+        prompt: {
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userText }
+          ]
+        },
+        generationConfig,
+        maxOutputTokens: 512
+      };
+
+      const resp = await fetch(GEMINI_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + apiKey
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if(!resp.ok){
+        const text = await resp.text().catch(()=> '');
+        const err = new Error((text||resp.statusText) || 'Request failed');
+        err.status = resp.status;
+        err.body = text;
+        throw err;
+      }
+
+      const json = await resp.json();
+      const modelText = extractModelText(json);
+      let parsed;
+      try {
+        parsed = JSON.parse(modelText);
+      } catch(e){
+        const match = modelText.match(/\{[\s\S]*\}/);
+        if(match){
+          try { parsed = JSON.parse(match[0]); }
+          catch { throw new Error("MODEL_RETURNED_NON_JSON"); }
+        } else {
+          throw new Error("MODEL_RETURNED_NON_JSON");
+        }
+      }
+      return parsed;
+    }
+
+    function showError(err){
+      const status = err?.status;
+      let friendly = escapeHtml(err?.message || String(err));
+      if(err.message === 'NO_API_KEY') friendly = 'No API key provided — running local mock demo.';
+      else if(err.message.includes('MODEL_RETURNED_NON_JSON')) friendly = 'AI returned invalid JSON.';
+      else if(status === 401 || status === 403) friendly = 'Authentication/permission error. Check API key and billing.';
+      else if(status === 404) friendly = 'Model endpoint not found (404). Check model name or endpoint.';
+      responseArea.innerHTML = `
+        <div class="result-card error">
+          <strong>Oops — something went wrong</strong>
+          <div class="muted" style="margin-top:8px">${escapeHtml(friendly)}</div>
+        </div>
+      `;
+    }
+
+    async function handleAnalyze(){
+      const userText = vibeInput.value.trim();
+      if(!userText){ responseArea.innerHTML = `<div class="muted">Please enter your feedback first ✨</div>`; return; }
+
+      setLoading();
+
+      try {
+        const data = await callGeminiAPI(userText);
+        responseArea.innerHTML = buildHtmlFromResult(data);
+      } catch(err) {
+        console.warn('API error — falling back to mock:', err);
+        // Show friendly error then fallback to mock result
+        showError(err);
+        setTimeout(()=> responseArea.innerHTML = buildHtmlFromResult(createMockResponse(userText)), 700);
+      }
+    }
+
+    findBtn.addEventListener('click', handleAnalyze);
+    vibeInput.addEventListener('keydown', (e)=>{
+      if((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); handleAnalyze(); }
+    });
+  </script>
+
+  <!-- ====== History + Pie chart + result actions ====== -->
+  <script>
+/* utilities */
+function downloadObjectAsJson(obj, filename){
+  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(obj, null, 2));
+  const a = document.createElement('a'); a.href = dataStr; a.download = filename + ".json"; document.body.appendChild(a); a.click(); a.remove();
+}
+async function writeToClipboard(text){ try{ await navigator.clipboard.writeText(text); return true }catch(e){return false} }
+
+/* history storage */
+const HISTORY_KEY = 'feedbackai_history_v2';
+function getHistory(){ try{ return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]"); }catch(e){ return [] } }
+function saveHistoryItem(item){
+  const h = getHistory();
+  h.unshift(item);
+  if(h.length>100) h.length = 100;
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(h));
+  if($('#history').classList.contains('active')) renderHistory();
+}
+function deleteHistoryAt(idx){
+  const h = getHistory();
+  if(idx<0 || idx>=h.length) return;
+  h.splice(idx,1);
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(h));
+  renderHistory();
+}
+function clearHistory(){ localStorage.removeItem(HISTORY_KEY); renderHistory(); }
+
+/* paging / filtering for history */
+let HISTORY_PAGE = 0;
+const PAGE_SIZE = 10;
+
+function filterAndSortHistory({search='', sentiment='all', sort='newest'} = {}){
+  let items = getHistory().slice(); // copy
+  if(sentiment && sentiment !== 'all'){
+    items = items.filter(it => String(it.sentiment||'').toLowerCase() === sentiment.toLowerCase());
+  }
+  if(search && search.trim()){
+    const q = search.toLowerCase();
+    items = items.filter(it => {
+      return (JSON.stringify(it).toLowerCase().includes(q));
+    });
+  }
+  items.sort((a,b)=>{
+    const ta = a.t||0, tb = b.t||0;
+    return sort === 'newest' ? tb - ta : ta - tb;
+  });
+  return items;
+}
+
+/* render history onto History page */
+function renderHistory(){
+  const root = $('#history-list-root');
+  const search = $('#history-search').value || '';
+  const sentiment = $('#history-filter').value || 'all';
+  const sort = $('#history-sort').value || 'newest';
+  const items = filterAndSortHistory({search, sentiment, sort});
+
+  $('#history-count').textContent = `${items.length} item${items.length!==1 ? 's' : ''}`;
+
+  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+  if(HISTORY_PAGE >= totalPages) HISTORY_PAGE = totalPages-1;
+  if(HISTORY_PAGE < 0) HISTORY_PAGE = 0;
+  $('#page-indicator').textContent = `Page ${HISTORY_PAGE+1} / ${totalPages}`;
+
+  const pageItems = items.slice(HISTORY_PAGE * PAGE_SIZE, (HISTORY_PAGE+1)*PAGE_SIZE);
+  if(!pageItems.length){
+    root.innerHTML = `<div class="muted">No analyses match your filter / search.</div>`;
+  } else {
+    root.innerHTML = pageItems.map((it, i) => {
+      const globalIdx = getHistory().indexOf(it); // index in full history array
+      return `
+        <div class="history-list-item" data-idx="${globalIdx}">
+          <div style="flex:1">
+            <div style="font-weight:700;font-size:14px">${escapeHtml(it.sentiment||'Analysis')}</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:6px">${escapeHtml(it.mainTheme||'')} • ${new Date(it.t||Date.now()).toLocaleString()}</div>
+            <div style="margin-top:6px;color:var(--muted);font-size:13px;max-width:58ch;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml((it.keyThemes||[]).join(', '))}</div>
+          </div>
+          <div class="history-controls">
+            <button data-idx="${globalIdx}" class="btn history-open">Open</button>
+            <button data-idx="${globalIdx}" class="btn history-download">↓</button>
+            <button data-idx="${globalIdx}" class="btn history-share">Share</button>
+            <button data-idx="${globalIdx}" class="btn history-delete" style="background:rgba(255,70,70,0.08);color:var(--error-text);border-color:rgba(255,70,70,0.12)">Delete</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // attach handlers
+  $$('.history-open', root).forEach(btn => btn.addEventListener('click', (e)=>{
+    const idx = Number(e.currentTarget.dataset.idx);
+    const item = getHistory()[idx];
+    if(item){
+      showPage('home');
+      responseArea.innerHTML = buildHtmlFromResult(item);
+      responseArea.scrollIntoView({behavior:'smooth', block:'center'});
+    }
+  }));
+  $$('.history-download', root).forEach(btn => btn.addEventListener('click', (e)=>{
+    const idx = Number(e.currentTarget.dataset.idx);
+    const item = getHistory()[idx];
+    if(item) downloadObjectAsJson(item, `feedbackai-${new Date(item.t||Date.now()).toISOString()}`);
+  }));
+  $$('.history-share', root).forEach(btn => btn.addEventListener('click', async (e)=>{
+    const idx = Number(e.currentTarget.dataset.idx);
+    const item = getHistory()[idx];
+    if(!item) return;
+    try {
+      const payload = btoa(unescape(encodeURIComponent(JSON.stringify(item))));
+      const url = `${location.origin}${location.pathname}#r=${payload}`;
+      const ok = await writeToClipboard(url);
+      const el = e.currentTarget;
+      el.textContent = ok ? 'Copied ✓' : 'Share';
+      setTimeout(()=> el.textContent = 'Share', 1300);
+    } catch(err){
+      prompt('Shareable link', location.href);
+    }
+  }));
+  $$('.history-delete', root).forEach(btn => btn.addEventListener('click', (e)=>{
+    const idx = Number(e.currentTarget.dataset.idx);
+    if(confirm('Delete this history item?')) deleteHistoryAt(idx);
+  }));
+
+  // update pie chart
+  renderSentimentPie(items);
+}
+
+/* navigation toolbar handlers */
+$('#history-search').addEventListener('input', ()=> { HISTORY_PAGE = 0; renderHistory(); });
+$('#history-filter').addEventListener('change', ()=> { HISTORY_PAGE = 0; renderHistory(); });
+$('#history-sort').addEventListener('change', ()=> { HISTORY_PAGE = 0; renderHistory(); });
+
+$('#prev-page').addEventListener('click', ()=> { HISTORY_PAGE = Math.max(0, HISTORY_PAGE-1); renderHistory(); });
+$('#next-page').addEventListener('click', ()=> { HISTORY_PAGE += 1; renderHistory(); });
+
+$('#clear-history-global').addEventListener('click', ()=> {
+  if(confirm('Clear all saved analyses? This cannot be undone.')) clearHistory();
+});
+
+/* import JSON */
+$('#import-json').addEventListener('click', ()=> $('#import-file').click());
+$('#import-file').addEventListener('change', (e)=>{
+  const f = e.target.files?.[0];
+  if(!f) return;
+  const r = new FileReader();
+  r.onload = ()=> {
+    try {
+      const parsed = JSON.parse(r.result);
+      const existing = getHistory();
+      if(Array.isArray(parsed)){
+        // map objects to include timestamp if missing
+        const sanitized = parsed.map(x => ({ ...(x||{}), t: x.t || Date.now() }));
+        const merged = sanitized.concat(existing).slice(0,100);
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(merged));
+      } else if(typeof parsed === 'object'){
+        const entry = { ...(parsed||{}), t: Date.now() };
+        existing.unshift(entry);
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(existing.slice(0,100)));
+      } else {
+        alert('Unsupported JSON format');
+      }
+      renderHistory();
+      alert('Import complete');
+    } catch(err){
+      alert('Failed to parse JSON file');
+    }
+  };
+  r.readAsText(f);
+});
+
+/* process permalink on load */
+(function processPermalink(){
+  const m = location.hash.match(/r=([^&]+)/);
+  if(m && m[1]){
+    try {
+      const decoded = decodeURIComponent(escape(atob(m[1])));
+      const parsed = JSON.parse(decoded);
+      showPage('home');
+      responseArea.innerHTML = buildHtmlFromResult(parsed);
+      setTimeout(()=> responseArea.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
+    } catch(e){ console.warn('permalink decode failed', e); }
+  }
+})();
+
+/* Attach result controls (copy/download/share/chart/save history) */
+const resultObserver = new MutationObserver((mutations)=>{
+  for(const m of mutations){
+    for(const node of Array.from(m.addedNodes)){
+      if(node.nodeType===1 && (node.matches('.result-card') || node.querySelector && node.querySelector('.result-card'))){
+        const root = node.matches('.result-card') ? node : node.querySelector('.result-card');
+        enhanceResult(root);
+      }
+    }
+  }
+});
+resultObserver.observe(responseArea, { childList:true, subtree:false });
+
+function enhanceResult(root){
+  // append controls if not already present
+  if(root.dataset.enhanced) return;
+  root.dataset.enhanced = '1';
+  const pre = root.querySelector('pre');
+  let parsed = {};
+  if(pre){
+    try { parsed = JSON.parse(pre.textContent); } catch(e){ parsed = {}; }
+  }
+  const controls = document.createElement('div');
+  controls.style = "display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;align-items:center";
+  controls.innerHTML = `
+    <button id="copy-json" class="btn">Copy JSON</button>
+    <button id="download-json" class="btn">Download JSON</button>
+    <button id="share-link" class="btn">Share Link</button>
+    <button id="show-chart" class="btn">Show Word Chart</button>
+    <div id="word-chart-wrap" style="margin-top:12px;display:none;width:100%">
+      <canvas id="word-chart" width="800" height="220" style="width:100%;max-width:820px;border-radius:8px;background:rgba(0,0,0,0.04)"></canvas>
+    </div>
+  `;
+  root.appendChild(controls);
+
+  $('#copy-json', root).addEventListener('click', async ()=>{
+    const ok = await writeToClipboard(JSON.stringify(parsed, null, 2));
+    $('#copy-json', root).textContent = ok ? 'Copied ✓' : 'Copy JSON';
+    setTimeout(()=> $('#copy-json', root).textContent = 'Copy JSON', 1200);
+  });
+  $('#download-json', root).addEventListener('click', ()=> {
+    downloadObjectAsJson(parsed, 'feedbackai-result');
+  });
+  $('#share-link', root).addEventListener('click', ()=> {
+    try {
+      const payload = btoa(unescape(encodeURIComponent(JSON.stringify(parsed))));
+      const url = `${location.origin}${location.pathname}#r=${payload}`;
+      writeToClipboard(url).then(ok=>{
+        $('#share-link', root).textContent = ok ? 'Link copied ✓' : 'Share Link';
+        setTimeout(()=> $('#share-link', root).textContent = 'Share Link', 1400);
+      });
+    } catch(e){
+      prompt('Shareable link (copy):', location.href);
+    }
+  });
+  $('#show-chart', root).addEventListener('click', ()=> {
+    const wrap = root.querySelector('#word-chart-wrap');
+    const canvas = root.querySelector('#word-chart');
+    if(!wrap) return;
+    if(wrap.style.display === 'none' || wrap.style.display === ''){
+      const text = (vibeInput.value || '') + ' ' + (Object.values(parsed).join(' ') || '');
+      renderWordChart(text, canvas);
+      wrap.style.display = 'block';
+      $('#show-chart', root).textContent = 'Hide Chart';
+    } else {
+      wrap.style.display = 'none';
+      $('#show-chart', root).textContent = 'Show Word Chart';
+    }
+  });
+
+  // Save to history
+  try {
+    const now = Date.now();
+    const record = Object.assign({}, parsed, { t: now });
+    saveHistoryItem(record);
+  } catch(e){ console.warn('save to history failed', e); }
+}
+
+/* Word chart (same as before) */
+function tokenize(text){
+  if(!text) return [];
+  return text.toLowerCase().replace(/[^\w\s]/g,' ').split(/\s+/).filter(w=>w.length>2 && !['the','and','for','with','you','app','our','this','that','your','are','but','not','but','have','has'].includes(w));
+}
+function freqMap(tokens){
+  const m = {};
+  tokens.forEach(t => m[t] = (m[t] || 0) + 1);
+  return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,10);
+}
+function renderWordChart(text, canvas){
+  const ctx = canvas.getContext('2d');
+  const tokens = tokenize(text);
+  const pairs = freqMap(tokens);
+  const labels = pairs.map(p=>p[0]);
+  const values = pairs.map(p=>p[1]);
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  const pad = 18;
+  const w = canvas.width - pad*2;
+  const h = canvas.height - pad*2;
+  const barH = Math.floor(h / Math.max(labels.length,1)) - 8;
+  const max = Math.max(...values, 1);
+  ctx.font = '14px Inter, system-ui';
+  labels.forEach((label,i)=>{
+    const val = values[i];
+    const y = pad + i*(barH+8);
+    const barW = Math.round((val / max) * (w * 0.68));
+    ctx.fillStyle = 'rgba(255,255,255,0.06)';
+    ctx.fillRect(pad, y, w*0.78, barH);
+    const grad = ctx.createLinearGradient(pad,0,pad+barW,0);
+    grad.addColorStop(0,'#7c5cff'); grad.addColorStop(1,'#00d4ff');
+    ctx.fillStyle = grad;
+    ctx.fillRect(pad, y, barW, barH);
+    ctx.fillStyle = '#e8e8f0'; ctx.textBaseline = 'middle';
+    ctx.fillText(label, pad + w*0.82, y + barH/2);
+    ctx.fillText(String(val), pad + barW + 8, y + barH/2);
+  });
+}
+
+/* Pie chart for sentiment distribution */
+function renderSentimentPie(items){
+  const canvas = $('#sentiment-pie');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  const counts = { Positive:0, Negative:0, Mixed:0, Unknown:0 };
+  items.forEach(it => {
+    const s = (it.sentiment || 'Unknown');
+    if(counts[s] !== undefined) counts[s]++; else counts.Unknown++;
+  });
+  const data = [counts.Positive, counts.Mixed, counts.Negative, counts.Unknown];
+  const labels = ['Positive','Mixed','Negative','Unknown'];
+  const colors = ['#6ef3c7','#7c5cff','#ff7b7b','#e8e8f0'];
+  const total = data.reduce((a,b)=>a+b,0) || 1;
+  let start = -0.5 * Math.PI;
+  const cx = canvas.width/2;
+  const cy = canvas.height/2;
+  const radius = Math.min(cx,cy) - 8;
+  // Draw slices
+  data.forEach((v,i)=>{
+    const slice = v/total;
+    const end = start + slice * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(cx,cy);
+    ctx.arc(cx,cy,radius, start, end);
+    ctx.closePath();
+    ctx.fillStyle = colors[i];
+    ctx.globalAlpha = 0.95;
+    ctx.fill();
+    start = end;
+  });
+  // center label
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = '#0b0b14';
+  ctx.beginPath();
+  ctx.arc(cx,cy, radius*0.52, 0, Math.PI*2); ctx.closePath();
+  ctx.fillStyle = 'rgba(255,255,255,0.06)';
+  ctx.fill();
+  ctx.fillStyle = '#e8e8f0';
+  ctx.font = '14px Inter, system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillText(`${total}`, cx, cy-2);
+  ctx.font = '11px Inter, system-ui';
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  ctx.fillText('analyses', cx, cy+14);
+
+  // legend
+  const legendX = 8;
+  const legendY = canvas.height - 82;
+  ctx.font = '12px Inter, system-ui';
+  labels.forEach((lab,i)=>{
+    ctx.fillStyle = colors[i];
+    ctx.fillRect(legendX, legendY + i*18, 12, 12);
+    ctx.fillStyle = '#e8e8f0';
+    ctx.fillText(`${lab} (${data[i]})`, legendX + 18, legendY + i*18 + 10);
+  });
+}
+
+/* initialize: show any initial history */
+renderHistory();
+  </script>
+
+</body>
+</html>
